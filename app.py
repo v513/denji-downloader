@@ -11,6 +11,7 @@ app = Flask(__name__)
 @app.route("/", methods=["GET", "POST"])
 def index():
     carpeta_descargas = str(Path.home() / "Downloads")
+    ffmpeg_dir = os.path.join(os.getcwd(), "ffmpeg_bin")  # <- esta línea es clave
 
     if request.method == "POST":
         url = request.form["url"]
@@ -32,7 +33,8 @@ def index():
             ydl_opts = {
                 'format': f"bestvideo[height<={height}]+bestaudio/best",
                 'outtmpl': os.path.join(carpeta_descargas, f'%(title)s_{height}p.%(ext)s'),
-                'merge_output_format': 'mp4'
+                'merge_output_format': 'mp4',
+                'ffmpeg_location': ffmpeg_dir
             }
 
         elif tipo == "audio":
@@ -43,6 +45,7 @@ def index():
             ydl_opts = {
                 'format': 'bestaudio/best',
                 'outtmpl': os.path.join(carpeta_descargas, f'%(title)s.%(ext)s'),
+                'ffmpeg_location': ffmpeg_dir,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': formato,
@@ -53,14 +56,18 @@ def index():
         else:
             return "❌ Tipo no válido."
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            archivo_final = ydl.prepare_filename(info)
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                archivo_final = ydl.prepare_filename(info)
 
-        if tipo == "audio":
-            archivo_final = archivo_final.rsplit(".", 1)[0] + f".{formato}"
+            if tipo == "audio":
+                archivo_final = archivo_final.rsplit(".", 1)[0] + f".{formato}"
 
-        return send_file(archivo_final, as_attachment=True)
+            return send_file(archivo_final, as_attachment=True)
+
+        except Exception as e:
+            return f"❌ Error al procesar el video: {str(e)}"
 
     return render_template("index.html")
 
@@ -82,3 +89,4 @@ def iniciar_app():
 if __name__ == '__main__':
     multiprocessing.freeze_support()
     iniciar_app()
+
